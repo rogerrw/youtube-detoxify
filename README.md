@@ -12,35 +12,9 @@ A Chrome extension to help you manage and reduce your YouTube usage through time
 - **Daily Reset**: Statistics automatically reset at midnight
 - **Settings**: Toggle tracking and blocking features on/off
 
-## Project Structure
-
-```
-youtube-detoxify/
-├── manifest.json          # Extension configuration
-├── popup.html             # Extension popup UI
-├── popup.css              # Popup styles
-├── popup.js               # Popup logic
-├── content.js             # Script that runs on YouTube pages
-├── embed-detector.js      # Script that detects embedded YouTube videos on any website
-├── content.css            # Styles for content script
-├── background.js          # Background service worker
-├── icons/                 # Extension icons (you'll need to add these)
-└── README.md              # This file
-```
-
 ## Setup Instructions
 
-### 1. Create Extension Icons
-
-You'll need to create icon files for the extension. Create an `icons` folder and add three PNG images:
-
-- `icon16.png` (16x16 pixels)
-- `icon48.png` (48x48 pixels)
-- `icon128.png` (128x128 pixels)
-
-You can use any image editor or online tool to create these. For now, you can use placeholder images or create simple colored squares.
-
-### 2. Load the Extension in Chrome
+### 1. Load the Extension in Chrome
 
 1. Open Chrome and navigate to `chrome://extensions/`
 2. Enable "Developer mode" (toggle in the top right)
@@ -48,7 +22,7 @@ You can use any image editor or online tool to create these. For now, you can us
 4. Select the `youtube-detoxify` folder
 5. The extension should now appear in your extensions list
 
-### 3. Pin the Extension (Optional)
+### 2. Pin the Extension (Optional)
 
 1. Click the puzzle piece icon in Chrome's toolbar
 2. Find "YouTube Detoxify" and click the pin icon to keep it visible
