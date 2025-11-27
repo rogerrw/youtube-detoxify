@@ -188,13 +188,7 @@ async function getVideoTitleFromAPI(videoId) {
 }
 
 function blockEmbeddedVideo(iframe) {
-  // Store original iframe attributes
-  const originalSrc = iframe.src;
-  const originalStyle = iframe.style.cssText;
   const parent = iframe.parentElement;
   parent.classList.add("youtube-embed-block");
-  // Hide the iframe
   iframe.style.display = "none";
-  iframe.setAttribute("data-youtube-detoxify-blocked", "true");
-  iframe.setAttribute("data-youtube-detoxify-original-src", originalSrc);
 }
