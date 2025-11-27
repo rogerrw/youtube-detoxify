@@ -20,6 +20,7 @@ async function safeStorageGet(keys) {
 
 (async () => {
   try {
+    console.log("window.location", window.location);
     // Only run on pages that aren't YouTube itself
     if (
       window.location.hostname === "www.youtube.com" ||
@@ -35,7 +36,9 @@ async function safeStorageGet(keys) {
       "allowlistKeywords",
     ]);
 
-    if (result.enableBlocking && result.isBlocked) {
+    console.log("result", result);
+
+    if (result.enableBlocking) {
       // Find and process all YouTube iframes
       await processYouTubeEmbeds(result.allowlistKeywords || []);
 
@@ -53,6 +56,7 @@ async function processYouTubeEmbeds(keywords) {
   for (const iframe of iframes) {
     const src = iframe.src || iframe.getAttribute("src") || "";
     if (isYouTubeEmbed(src)) {
+      console.log("iframe", iframe);
       const videoId = extractVideoId(src);
       if (videoId) {
         const shouldBlock = await shouldBlockEmbed(videoId, keywords);
@@ -188,69 +192,9 @@ function blockEmbeddedVideo(iframe) {
   const originalSrc = iframe.src;
   const originalStyle = iframe.style.cssText;
   const parent = iframe.parentElement;
-
-  // Create a blocking overlay
-  const blockOverlay = document.createElement("div");
-  blockOverlay.className = "youtube-embed-block";
-  blockOverlay.style.cssText = `
-    position: relative;
-    width: 100%;
-    height: 100%;
-    min-height: 200px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 20px;
-    box-sizing: border-box;
-    border-radius: 8px;
-  `;
-
-  blockOverlay.innerHTML = `
-    <div style="font-size: 48px; margin-bottom: 15px;">🚫</div>
-    <h3 style="font-size: 20px; margin-bottom: 10px; font-weight: 600;">YouTube Video Blocked</h3>
-    <p style="font-size: 14px; opacity: 0.9; margin-bottom: 15px;">
-      This embedded video has been blocked by YouTube Detoxify.
-    </p>
-    <button class="unblock-embed-btn" style="
-      padding: 8px 16px;
-      font-size: 14px;
-      background: white;
-      color: #667eea;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-    ">Unblock This Video</button>
-  `;
-
+  parent.classList.add("youtube-embed-block");
   // Hide the iframe
   iframe.style.display = "none";
   iframe.setAttribute("data-youtube-detoxify-blocked", "true");
   iframe.setAttribute("data-youtube-detoxify-original-src", originalSrc);
-
-  // Insert overlay
-  if (parent) {
-    // Try to maintain the same dimensions as the iframe
-    const iframeWidth = iframe.width || iframe.style.width || "100%";
-    const iframeHeight = iframe.height || iframe.style.height || "315px";
-
-    blockOverlay.style.width = iframeWidth;
-    blockOverlay.style.height = iframeHeight;
-    blockOverlay.style.minHeight = iframeHeight;
-
-    parent.insertBefore(blockOverlay, iframe);
-
-    // Handle unblock button
-    const unblockBtn = blockOverlay.querySelector(".unblock-embed-btn");
-    unblockBtn.addEventListener("click", () => {
-      // Restore iframe
-      iframe.style.display = "";
-      iframe.removeAttribute("data-youtube-detoxify-blocked");
-      blockOverlay.remove();
-    });
-  }
 }
