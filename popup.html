@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YouTube Detoxify</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>YouTube Detoxify</h1>
+      </header>
+
+      <main>
+        <div class="stats-section">
+          <div class="stat-item">
+            <span class="stat-label">Time Today:</span>
+            <span class="stat-value" id="timeToday">0h 0m</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Visits Today:</span>
+            <span class="stat-value" id="visitsToday">0</span>
+          </div>
+        </div>
+
+        <div class="controls-section">
+          <button id="blockBtn" class="btn btn-primary">Block YouTube</button>
+          <button id="unblockBtn" class="btn btn-secondary">
+            Unblock YouTube
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <label>
+            <input type="checkbox" id="enableTracking" /> Enable time tracking
+          </label>
+          <label>
+            <input type="checkbox" id="enableBlocking" /> Enable blocking
+          </label>
+        </div>
+
+        <div class="allowlist-section">
+          <h3 class="allowlist-title">Allowlist Keywords</h3>
+          <p class="allowlist-description">
+            Videos with these keywords in the title will not be blocked
+          </p>
+          <div class="allowlist-input-container">
+            <input
+              type="text"
+              id="keywordInput"
+              placeholder="Enter keyword..."
+              class="keyword-input"
+            />
+            <button id="addKeywordBtn" class="btn btn-small">Add</button>
+          </div>
+          <div id="keywordsList" class="keywords-list"></div>
+        </div>
+      </main>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

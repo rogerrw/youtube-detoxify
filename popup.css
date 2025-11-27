@@ -1,0 +1,222 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  min-height: 400px;
+  max-height: 600px;
+  overflow-y: auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, sans-serif;
+  background: #f5f5f5;
+}
+
+.container {
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+header h1 {
+  font-size: 20px;
+  color: #333;
+  font-weight: 600;
+}
+
+.stats-section {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.stat-item:not(:last-child) {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.controls-section {
+  margin-bottom: 15px;
+}
+
+.btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+}
+
+.btn:last-child {
+  margin-bottom: 0;
+}
+
+.btn-primary {
+  background: #ff0000;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #cc0000;
+}
+
+.btn-secondary {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #45a049;
+}
+
+.settings-section {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.settings-section label {
+  display: block;
+  padding: 10px 0;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+}
+
+.settings-section label:not(:last-child) {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.settings-section input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.allowlist-section {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.allowlist-title {
+  font-size: 16px;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.allowlist-description {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.allowlist-input-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.keyword-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.keyword-input:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.btn-small {
+  width: auto;
+  padding: 8px 16px;
+  margin: 0;
+  background: #667eea;
+  color: white;
+  font-size: 13px;
+}
+
+.btn-small:hover {
+  background: #5568d3;
+}
+
+.keywords-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.keyword-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.keyword-text {
+  color: #333;
+  flex: 1;
+}
+
+.btn-remove {
+  width: auto;
+  padding: 4px 10px;
+  margin: 0;
+  background: #dc3545;
+  color: white;
+  font-size: 11px;
+  border-radius: 4px;
+}
+
+.btn-remove:hover {
+  background: #c82333;
+}
+
+.keywords-list:empty::before {
+  content: "No keywords added yet";
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px;
+  text-align: center;
+}

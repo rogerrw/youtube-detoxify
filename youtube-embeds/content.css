@@ -1,0 +1,5 @@
+/* Content script styles for YouTube embed blocking */
+
+.youtube-embed-block {
+  display: none;
+}
