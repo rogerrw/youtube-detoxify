@@ -29,28 +29,31 @@ async function safeStorageGet(keys) {
       return;
     }
 
-    // Check if blocking is enabled
+    // Get allowlist settings - blocking is always enabled
     const result = await safeStorageGet([
-      "isBlocked",
-      "enableBlocking",
       "allowlistKeywords",
+      "allowlistChannels",
     ]);
 
     console.log("result", result);
 
-    if (result.enableBlocking) {
-      // Find and process all YouTube iframes
-      await processYouTubeEmbeds(result.allowlistKeywords || []);
+    // Always check allowlists - blocking is always enabled
+    await processYouTubeEmbeds(
+      result.allowlistKeywords || [],
+      result.allowlistChannels || []
+    );
 
-      // Watch for dynamically added iframes
-      observeNewEmbeds(result.allowlistKeywords || []);
-    }
+    // Watch for dynamically added iframes
+    observeNewEmbeds(
+      result.allowlistKeywords || [],
+      result.allowlistChannels || []
+    );
   } catch (error) {
     console.error("Error in embed detector:", error);
   }
 })();
 
-async function processYouTubeEmbeds(keywords) {
+async function processYouTubeEmbeds(keywords, channels) {
   const iframes = document.querySelectorAll("iframe");
 
   for (const iframe of iframes) {
@@ -59,7 +62,7 @@ async function processYouTubeEmbeds(keywords) {
       console.log("iframe", iframe);
       const videoId = extractVideoId(src);
       if (videoId) {
-        const shouldBlock = await shouldBlockEmbed(videoId, keywords);
+        const shouldBlock = await shouldBlockEmbed(videoId, keywords, channels);
         if (shouldBlock) {
           blockEmbeddedVideo(iframe);
         }
@@ -68,7 +71,7 @@ async function processYouTubeEmbeds(keywords) {
   }
 }
 
-function observeNewEmbeds(keywords) {
+function observeNewEmbeds(keywords, channels) {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       mutation.addedNodes.forEach((node) => {
@@ -79,11 +82,13 @@ function observeNewEmbeds(keywords) {
             if (isYouTubeEmbed(src)) {
               const videoId = extractVideoId(src);
               if (videoId) {
-                shouldBlockEmbed(videoId, keywords).then((shouldBlock) => {
-                  if (shouldBlock) {
-                    blockEmbeddedVideo(node);
+                shouldBlockEmbed(videoId, keywords, channels).then(
+                  (shouldBlock) => {
+                    if (shouldBlock) {
+                      blockEmbeddedVideo(node);
+                    }
                   }
-                });
+                );
               }
             }
           }
@@ -95,11 +100,13 @@ function observeNewEmbeds(keywords) {
               if (isYouTubeEmbed(src)) {
                 const videoId = extractVideoId(src);
                 if (videoId) {
-                  shouldBlockEmbed(videoId, keywords).then((shouldBlock) => {
-                    if (shouldBlock) {
-                      blockEmbeddedVideo(iframe);
+                  shouldBlockEmbed(videoId, keywords, channels).then(
+                    (shouldBlock) => {
+                      if (shouldBlock) {
+                        blockEmbeddedVideo(iframe);
+                      }
                     }
-                  });
+                  );
                 }
               }
             });
@@ -143,34 +150,53 @@ function extractVideoId(src) {
   return null;
 }
 
-async function shouldBlockEmbed(videoId, keywords) {
-  if (keywords.length === 0) {
-    return true; // No keywords, block all
+async function shouldBlockEmbed(videoId, keywords, channels) {
+  // If both allowlists are empty, block all videos by default
+  if (keywords.length === 0 && channels.length === 0) {
+    return true; // Block: no allowlists configured, default to blocking
   }
 
-  // Try to get video title using YouTube oEmbed API
+  // Try to get video info using YouTube oEmbed API
   try {
-    const title = await getVideoTitleFromAPI(videoId);
-    if (!title) {
-      return true; // Can't get title, block it
+    const videoInfo = await getVideoInfoFromAPI(videoId);
+    if (!videoInfo) {
+      return true; // Can't get info, block it
     }
 
-    // Check if any keyword matches (case-insensitive)
-    const titleLower = title.toLowerCase();
-    const matches = keywords.some((keyword) =>
-      titleLower.includes(keyword.toLowerCase())
-    );
+    let channelMatches = false;
+    let keywordMatches = false;
 
-    return !matches; // Block if no keywords match
+    // Check channel allowlist
+    if (channels.length > 0 && videoInfo.author_name) {
+      const channelLower = videoInfo.author_name.toLowerCase();
+      channelMatches = channels.some((channel) =>
+        channelLower.includes(channel.toLowerCase())
+      );
+    }
+
+    // Check title keywords allowlist
+    if (keywords.length > 0 && videoInfo.title) {
+      const titleLower = videoInfo.title.toLowerCase();
+      keywordMatches = keywords.some((keyword) =>
+        titleLower.includes(keyword.toLowerCase())
+      );
+    }
+
+    // Block if:
+    // 1. Channel is NOT in allowlist (or channels list is empty), AND
+    // 2. Title does NOT have allowlist keyword (or keywords list is empty)
+    // Allow if either channel matches OR title keyword matches
+    return !channelMatches && !keywordMatches;
   } catch (error) {
-    console.log("Error fetching video title:", error);
+    console.log("Error fetching video info:", error);
     return true; // On error, block it
   }
 }
 
-async function getVideoTitleFromAPI(videoId) {
+async function getVideoInfoFromAPI(videoId) {
   try {
     // Use YouTube oEmbed API (no API key required for public videos)
+    // This returns title and author_name (channel name)
     const response = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
     );
@@ -180,9 +206,12 @@ async function getVideoTitleFromAPI(videoId) {
     }
 
     const data = await response.json();
-    return data.title || null;
+    return {
+      title: data.title || null,
+      author_name: data.author_name || null,
+    };
   } catch (error) {
-    console.log("Error fetching video title from oEmbed:", error);
+    console.log("Error fetching video info from oEmbed:", error);
     return null;
   }
 }

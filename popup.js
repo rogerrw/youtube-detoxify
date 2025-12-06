@@ -40,14 +40,8 @@ async function safeStorageSet(items) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    // Load and display stats
-    await loadStats();
-
-    // Load settings
-    await loadSettings();
-
-    // Load allowlist keywords
-    await loadAllowlist();
+    // Load allowlists
+    await loadAllowlists();
 
     // Set up event listeners
     setupEventListeners();
@@ -56,139 +50,57 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 });
 
-async function loadStats() {
-  try {
-    const result = await safeStorageGet(["timeToday", "visitsToday"]);
-
-    const timeToday = result.timeToday || 0;
-    const visitsToday = result.visitsToday || 0;
-
-    // Format time
-    const hours = Math.floor(timeToday / 60);
-    const minutes = timeToday % 60;
-    const timeElement = document.getElementById("timeToday");
-    const visitsElement = document.getElementById("visitsToday");
-
-    if (timeElement) {
-      timeElement.textContent = `${hours}h ${minutes}m`;
-    }
-    if (visitsElement) {
-      visitsElement.textContent = visitsToday;
-    }
-  } catch (error) {
-    console.error("Error loading stats:", error);
-  }
-}
-
-async function loadSettings() {
-  try {
-    const result = await safeStorageGet(["enableTracking", "enableBlocking"]);
-
-    const trackingCheckbox = document.getElementById("enableTracking");
-    const blockingCheckbox = document.getElementById("enableBlocking");
-
-    if (trackingCheckbox) {
-      trackingCheckbox.checked = result.enableTracking !== false;
-    }
-    if (blockingCheckbox) {
-      blockingCheckbox.checked = result.enableBlocking !== false;
-    }
-  } catch (error) {
-    console.error("Error loading settings:", error);
-  }
-}
-
 function setupEventListeners() {
-  // Block/Unblock buttons
-  const blockBtn = document.getElementById("blockBtn");
-  const unblockBtn = document.getElementById("unblockBtn");
 
-  if (blockBtn) {
-    blockBtn.addEventListener("click", async () => {
-      try {
-        await safeStorageSet({ isBlocked: true });
-        try {
-          chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
-            tabs.forEach((tab) => {
-              chrome.tabs.reload(tab.id);
-            });
-          });
-        } catch (error) {
-          console.error("Error reloading tabs:", error);
-        }
-        alert("YouTube has been blocked. Refresh the page to see the effect.");
-      } catch (error) {
-        console.error("Error blocking YouTube:", error);
-      }
-    });
-  }
-
-  if (unblockBtn) {
-    unblockBtn.addEventListener("click", async () => {
-      try {
-        await safeStorageSet({ isBlocked: false });
-        try {
-          chrome.tabs.query({ url: "https://www.youtube.com/*" }, (tabs) => {
-            tabs.forEach((tab) => {
-              chrome.tabs.reload(tab.id);
-            });
-          });
-        } catch (error) {
-          console.error("Error reloading tabs:", error);
-        }
-        alert("YouTube has been unblocked.");
-      } catch (error) {
-        console.error("Error unblocking YouTube:", error);
-      }
-    });
-  }
-
-  // Settings checkboxes
-  const trackingCheckbox = document.getElementById("enableTracking");
-  const blockingCheckbox = document.getElementById("enableBlocking");
-
-  if (trackingCheckbox) {
-    trackingCheckbox.addEventListener("change", async (e) => {
-      try {
-        await safeStorageSet({ enableTracking: e.target.checked });
-      } catch (error) {
-        console.error("Error updating tracking setting:", error);
-      }
-    });
-  }
-
-  if (blockingCheckbox) {
-    blockingCheckbox.addEventListener("change", async (e) => {
-      try {
-        await safeStorageSet({ enableBlocking: e.target.checked });
-      } catch (error) {
-        console.error("Error updating blocking setting:", error);
-      }
-    });
-  }
-
-  // Allowlist keyword management
+  // Title keyword allowlist management
   const keywordInput = document.getElementById("keywordInput");
   const addKeywordBtn = document.getElementById("addKeywordBtn");
 
-  addKeywordBtn.addEventListener("click", async () => {
-    await addKeyword();
-  });
-
-  keywordInput.addEventListener("keypress", async (e) => {
-    if (e.key === "Enter") {
+  if (addKeywordBtn) {
+    addKeywordBtn.addEventListener("click", async () => {
       await addKeyword();
-    }
-  });
+    });
+  }
+
+  if (keywordInput) {
+    keywordInput.addEventListener("keypress", async (e) => {
+      if (e.key === "Enter") {
+        await addKeyword();
+      }
+    });
+  }
+
+  // Channel allowlist management
+  const channelInput = document.getElementById("channelInput");
+  const addChannelBtn = document.getElementById("addChannelBtn");
+
+  if (addChannelBtn) {
+    addChannelBtn.addEventListener("click", async () => {
+      await addChannel();
+    });
+  }
+
+  if (channelInput) {
+    channelInput.addEventListener("keypress", async (e) => {
+      if (e.key === "Enter") {
+        await addChannel();
+      }
+    });
+  }
 }
 
-async function loadAllowlist() {
+async function loadAllowlists() {
   try {
-    const result = await safeStorageGet(["allowlistKeywords"]);
+    const result = await safeStorageGet([
+      "allowlistKeywords",
+      "allowlistChannels",
+    ]);
     const keywords = result.allowlistKeywords || [];
+    const channels = result.allowlistChannels || [];
     displayKeywords(keywords);
+    displayChannels(channels);
   } catch (error) {
-    console.error("Error loading allowlist:", error);
+    console.error("Error loading allowlists:", error);
   }
 }
 
@@ -253,6 +165,73 @@ async function removeKeyword(index) {
   } catch (error) {
     console.error("Error removing keyword:", error);
     alert("Error removing keyword. Please try again.");
+  }
+}
+
+function displayChannels(channels) {
+  const channelsList = document.getElementById("channelsList");
+  if (!channelsList) return;
+
+  channelsList.innerHTML = "";
+
+  channels.forEach((channel, index) => {
+    const channelItem = document.createElement("div");
+    channelItem.className = "keyword-item";
+    channelItem.innerHTML = `
+      <span class="keyword-text">${escapeHtml(channel)}</span>
+      <button class="btn btn-remove" data-index="${index}">Remove</button>
+    `;
+    channelsList.appendChild(channelItem);
+
+    // Add remove event listener
+    channelItem
+      .querySelector(".btn-remove")
+      .addEventListener("click", async () => {
+        await removeChannel(index);
+      });
+  });
+}
+
+async function addChannel() {
+  try {
+    const channelInput = document.getElementById("channelInput");
+    const channel = channelInput.value.trim();
+
+    if (!channel) {
+      return;
+    }
+
+    const result = await safeStorageGet(["allowlistChannels"]);
+    const channels = result.allowlistChannels || [];
+
+    // Check if channel already exists (case-insensitive)
+    const channelLower = channel.toLowerCase();
+    if (channels.some((c) => c.toLowerCase() === channelLower)) {
+      alert("This channel is already in the allowlist.");
+      channelInput.value = "";
+      return;
+    }
+
+    channels.push(channel);
+    await safeStorageSet({ allowlistChannels: channels });
+    channelInput.value = "";
+    displayChannels(channels);
+  } catch (error) {
+    console.error("Error adding channel:", error);
+    alert("Error adding channel. Please try again.");
+  }
+}
+
+async function removeChannel(index) {
+  try {
+    const result = await safeStorageGet(["allowlistChannels"]);
+    const channels = result.allowlistChannels || [];
+    channels.splice(index, 1);
+    await safeStorageSet({ allowlistChannels: channels });
+    displayChannels(channels);
+  } catch (error) {
+    console.error("Error removing channel:", error);
+    alert("Error removing channel. Please try again.");
   }
 }
 

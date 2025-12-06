@@ -35,60 +35,192 @@ async function safeStorageSet(items) {
   }
 }
 
-(async () => {
+// Function to perform allowlist check
+async function performAllowlistCheck() {
   try {
-    // Check if blocking is enabled
-    const result = await safeStorageGet([
-      "isBlocked",
-      "enableBlocking",
+    // Get allowlist settings
+    const { allowlistKeywords, allowlistChannels } = await safeStorageGet([
       "allowlistKeywords",
+      "allowlistChannels",
     ]);
 
-    if (result.enableBlocking && result.isBlocked) {
-      // Check if current video matches allowlist
-      const isAllowed = await checkAllowlist(result.allowlistKeywords || []);
-      if (!isAllowed) {
-        showBlockPage();
-        return;
-      }
-    }
+    console.log("allowlistKeywords", allowlistKeywords);
+    console.log("allowlistChannels", allowlistChannels);
 
-    // Track time if enabled
-    if (result.enableTracking !== false) {
-      trackTime();
-      trackVisit();
+    // Always check allowlists - blocking is always enabled
+    const isAllowed = await checkAllowlist(
+      allowlistKeywords || [],
+      allowlistChannels || []
+    );
+    if (!isAllowed) {
+      redirectToBlockedPage();
+      return;
     }
   } catch (error) {
-    console.error("Error in content script:", error);
+    console.error("Error in allowlist check:", error);
   }
+}
+
+// Initial check on page load
+(async () => {
+  await performAllowlistCheck();
 })();
 
-async function checkAllowlist(keywords) {
-  // Only check allowlist on video pages
-  if (!window.location.pathname.includes("/watch")) {
-    return false; // Not a video page, so blocking applies
+// Watch for URL changes
+(function watchUrlChanges() {
+  let currentUrl = window.location.href;
+
+  // Function to check if URL changed and trigger allowlist check
+  function checkUrlChange() {
+    const newUrl = window.location.href;
+    if (newUrl !== currentUrl) {
+      currentUrl = newUrl;
+      console.log("URL changed to:", currentUrl);
+
+      // Wait for YouTube to load content, then check allowlist
+      const delay = 500;
+
+      setTimeout(() => {
+        performAllowlistCheck();
+      }, delay);
+    }
   }
 
-  if (keywords.length === 0) {
-    return false; // No keywords, so blocking applies
+  // Override pushState to detect navigation
+  const originalPushState = history.pushState;
+  history.pushState = function (...args) {
+    originalPushState.apply(history, args);
+    checkUrlChange();
+  };
+
+  // Override replaceState to detect navigation
+  const originalReplaceState = history.replaceState;
+  history.replaceState = function (...args) {
+    originalReplaceState.apply(history, args);
+    checkUrlChange();
+  };
+
+  // Listen for popstate (back/forward navigation)
+  window.addEventListener("popstate", checkUrlChange);
+
+  // Watch for URL changes using MutationObserver (for YouTube's SPA navigation)
+  // Only observe significant changes to avoid too many checks
+  const observer = new MutationObserver(() => {
+    setTimeout(checkUrlChange, 200);
+  });
+
+  // Observe changes to the document body
+  if (document.body) {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  } else {
+    // Wait for body to be available
+    document.addEventListener("DOMContentLoaded", () => {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    });
   }
 
-  // Try to get video title with retries (YouTube loads content dynamically)
-  let videoTitle = await getVideoTitle();
+  // Periodic check as fallback (less frequent)
+  setInterval(checkUrlChange, 2000);
+})();
 
-  if (!videoTitle) {
-    // Wait a bit and try again
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    videoTitle = await getVideoTitle();
+async function checkAllowlist(keywords, channels) {
+  // Only check allowlist on video pages (URLs starting with /watch?)
+  const isVideoPage =
+    window.location.pathname.startsWith("/watch") ||
+    window.location.href.includes("youtube.com/watch");
+
+  console.log("isVideoPage", isVideoPage);
+  if (!isVideoPage) {
+    return true; // Not a video page, so allow all videos
   }
 
-  if (!videoTitle) {
-    return false; // Can't find title, apply blocking
+  // If both allowlists are empty, block all videos by default
+  if (keywords.length === 0 && channels.length === 0) {
+    return false; // Block: no allowlists configured, default to blocking
   }
 
-  // Check if any keyword matches (case-insensitive)
-  const titleLower = videoTitle.toLowerCase();
-  return keywords.some((keyword) => titleLower.includes(keyword.toLowerCase()));
+  let channelMatches = false;
+  let keywordMatches = false;
+
+  // Check channel allowlist
+  if (channels.length > 0) {
+    const channelName = getChannelName();
+    if (channelName) {
+      const channelLower = channelName.toLowerCase();
+      channelMatches = channels.some((channel) =>
+        channelLower.includes(channel.toLowerCase())
+      );
+    }
+  }
+
+  // Check title keywords allowlist
+  if (keywords.length > 0) {
+    // Try to get video title with retries (YouTube loads content dynamically)
+    let videoTitle = await getVideoTitle();
+
+    if (!videoTitle) {
+      // Wait a bit and try again
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      videoTitle = await getVideoTitle();
+    }
+
+    if (videoTitle) {
+      // Check if any keyword matches (case-insensitive)
+      const titleLower = videoTitle.toLowerCase();
+      keywordMatches = keywords.some((keyword) =>
+        titleLower.includes(keyword.toLowerCase())
+      );
+    }
+  }
+
+  // Block if:
+  // 1. Channel is NOT in allowlist (or channels list is empty), AND
+  // 2. Title does NOT have allowlist keyword (or keywords list is empty)
+  // Allow if either channel matches OR title keyword matches
+  const shouldBlock = !channelMatches && !keywordMatches;
+  return !shouldBlock; // Return true to allow, false to block
+}
+
+function getChannelName() {
+  // Try multiple selectors to get channel name (YouTube changes these sometimes)
+  const channelSelectors = [
+    "ytd-channel-name a",
+    "ytd-video-owner-renderer #channel-name a",
+    "ytd-channel-name #text",
+    "ytd-video-owner-renderer #channel-name #text",
+    ".ytd-channel-name a",
+    "#owner-sub-count a",
+    "#channel-name a",
+  ];
+
+  for (const selector of channelSelectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      const channelName = element.textContent || element.innerText || "";
+      if (channelName.trim()) {
+        return channelName.trim();
+      }
+    }
+  }
+
+  // Fallback: try to get from link href
+  const channelLink = document.querySelector(
+    'ytd-channel-name a[href*="/channel/"], ytd-channel-name a[href*="/c/"], ytd-channel-name a[href*="/user/"], ytd-channel-name a[href*="/@"]'
+  );
+  if (channelLink) {
+    const channelName = channelLink.textContent || channelLink.innerText || "";
+    if (channelName.trim()) {
+      return channelName.trim();
+    }
+  }
+
+  return null;
 }
 
 function getVideoTitle() {
@@ -121,144 +253,9 @@ function getVideoTitle() {
   return null;
 }
 
-function showBlockPage() {
-  // Hide YouTube content
-  document.body.innerHTML = "";
-  document.body.style.margin = "0";
-  document.body.style.padding = "0";
-  document.body.style.fontFamily =
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-
-  // Create block page
-  const blockDiv = document.createElement("div");
-  blockDiv.className = "youtube-block-page";
-  blockDiv.innerHTML = `
-    <div style="
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      text-align: center;
-      padding: 20px;
-    ">
-      <h1 style="font-size: 48px; margin-bottom: 20px;">🚫</h1>
-      <h2 style="font-size: 32px; margin-bottom: 15px; font-weight: 600;">YouTube is Blocked</h2>
-      <p style="font-size: 18px; margin-bottom: 30px; opacity: 0.9;">
-        You've chosen to block YouTube. Take a break and do something productive!
-      </p>
-      <button id="unblockBtn" style="
-        padding: 12px 24px;
-        font-size: 16px;
-        background: white;
-        color: #667eea;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-      ">Unblock YouTube</button>
-    </div>
-  `;
-
-  document.body.appendChild(blockDiv);
-
-  // Handle unblock button
-  document.getElementById("unblockBtn").addEventListener("click", async () => {
-    try {
-      await safeStorageSet({ isBlocked: false });
-      location.reload();
-    } catch (error) {
-      console.error("Error unblocking:", error);
-      // Still reload even if storage fails
-      location.reload();
-    }
-  });
-}
-
-async function trackTime() {
-  try {
-    // Get current time tracking data
-    const result = await safeStorageGet([
-      "timeToday",
-      "lastActiveTime",
-      "today",
-    ]);
-
-    const now = new Date();
-    const today = now.toDateString();
-
-    // Reset if it's a new day
-    if (result.today !== today) {
-      await safeStorageSet({
-        timeToday: 0,
-        visitsToday: 0,
-        today: today,
-      });
-    }
-
-    // Track active time
-    let timeToday = result.timeToday || 0;
-    const lastActiveTime = result.lastActiveTime;
-
-    if (lastActiveTime) {
-      const timeDiff = Math.floor((now - new Date(lastActiveTime)) / 1000 / 60);
-      if (timeDiff > 0 && timeDiff < 60) {
-        // Only count if less than 60 minutes (prevents large jumps)
-        timeToday += timeDiff;
-        await safeStorageSet({ timeToday });
-      }
-    }
-
-    // Update last active time
-    await safeStorageSet({ lastActiveTime: now.toISOString() });
-
-    // Update every minute
-    setInterval(async () => {
-      try {
-        const currentResult = await safeStorageGet([
-          "timeToday",
-          "lastActiveTime",
-        ]);
-        const currentTime = new Date();
-        const lastTime = new Date(currentResult.lastActiveTime);
-        const timeDiff = Math.floor((currentTime - lastTime) / 1000 / 60);
-
-        if (timeDiff > 0 && timeDiff < 60) {
-          const newTime = (currentResult.timeToday || 0) + timeDiff;
-          await safeStorageSet({
-            timeToday: newTime,
-            lastActiveTime: currentTime.toISOString(),
-          });
-        }
-      } catch (error) {
-        // Silently fail if extension context is invalidated
-        if (!error.message.includes("Extension context invalidated")) {
-          console.error("Error updating time:", error);
-        }
-      }
-    }, 60000); // Update every minute
-  } catch (error) {
-    console.error("Error in trackTime:", error);
-  }
-}
-
-async function trackVisit() {
-  try {
-    const result = await safeStorageGet(["visitsToday", "today"]);
-    const today = new Date().toDateString();
-
-    if (result.today !== today) {
-      await safeStorageSet({
-        visitsToday: 1,
-        today: today,
-      });
-    } else {
-      const visitsToday = (result.visitsToday || 0) + 1;
-      await safeStorageSet({ visitsToday });
-    }
-  } catch (error) {
-    console.error("Error tracking visit:", error);
-  }
+function redirectToBlockedPage() {
+  // Get the extension's blocked page URL
+  const blockedPageUrl = chrome.runtime.getURL("blocked.html");
+  // Redirect to the blocked page
+  window.location.replace(blockedPageUrl);
 }

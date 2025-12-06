@@ -6,19 +6,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
   // Initialize default settings
   chrome.storage.local.set({
-    enableTracking: true,
-    enableBlocking: true,
-    isBlocked: false,
-    timeToday: 0,
-    visitsToday: 0,
-    today: new Date().toDateString(),
     allowlistKeywords: [],
+    allowlistChannels: [],
   });
 });
-
-function getNextMidnight() {
-  const now = new Date();
-  const midnight = new Date();
-  midnight.setHours(24, 0, 0, 0);
-  return midnight.getTime();
-}
